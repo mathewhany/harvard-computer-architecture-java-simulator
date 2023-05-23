@@ -6,64 +6,60 @@ public class AssemblyInstructionParser implements InstructionParser {
         return 0;
     }
 
-    private static String parseMIPSAssembly(String assemblyCode) {
+    private static short parseMIPSAssembly(String assemblyCode) {
         String[] assemblyCodeArray = assemblyCode.split(" ");
-        String binaryCode = "";
+        short binaryCode = 0;
         switch (assemblyCodeArray[0]) {
             case "ADD":
-                binaryCode = "0000";
+                binaryCode = 0;
                 break;
             case "SUB":
-                binaryCode = "0001";
+                binaryCode = 1;
                 break;
             case "MUL":
-                binaryCode = "0010";
+                binaryCode = 2;
                 break;
             case "LDI":
-                binaryCode = "0011";
+                binaryCode = 3;
                 break;
             case "BEQZ":
-                binaryCode = "0100";
+                binaryCode = 4;
                 break;
             case "AND":
-                binaryCode = "0101";
+                binaryCode = 5;
                 break;
             case "OR":
-                binaryCode = "0110";
+                binaryCode = 6;
                 break;
             case "JR":
-                binaryCode = "0111";
+                binaryCode = 7;
                 break;
             case "SLC":
-                binaryCode = "1000";
+                binaryCode = 8;
                 break;
             case "SRC":
-                binaryCode = "1001";
+                binaryCode = 9;
                 break;
             case "LB":
-                binaryCode = "1010";
+                binaryCode = 10;
                 break;
             case "SB":
-                binaryCode = "1011";
+                binaryCode = 11;
                 break;
         }
-        String firstOperand = integerToBinary(Integer.parseInt(assemblyCodeArray[1].substring(1)));
-        String secondOperand = "";
-        if (assemblyCodeArray[2].charAt(0) == 'R') {
-            secondOperand = integerToBinary(Integer.parseInt(assemblyCodeArray[2].substring(1)));
-        } else {
-            secondOperand = integerToBinary(Integer.parseInt(assemblyCodeArray[2]));
+        int firstOperand = Integer.parseInt(assemblyCodeArray[1].substring(1));
+        int secondOperand = 0;
+        if(assemblyCodeArray[2].charAt(0) == 'R'){
+            secondOperand = Integer.parseInt(assemblyCodeArray[2].substring(1));
+        }else{
+            secondOperand = Integer.parseInt(assemblyCodeArray[2]);
         }
-        binaryCode += firstOperand + secondOperand;
-
+        binaryCode = (short) (binaryCode << 6 | firstOperand);
+        binaryCode = (short) (binaryCode << 6 | secondOperand);
         return binaryCode;
     }
 
 
-    private static String integerToBinary(int number) {
-        String binary = Integer.toBinaryString(number);
-        return String.format("%6s", binary).replace(' ', '0');
-    }
 
     private static void test() {
         String assemblyCode1 = "ADD R0 R1";
