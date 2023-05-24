@@ -1,67 +1,68 @@
 package ca.memory;
 
 public class RegisterFile {
-    public RegisterFile(int numberOfGeneralPurposeRegisters) {
+    final private byte[] GPRegisters;
+    private SREG sreg;
+    private static short PC;
 
+    public RegisterFile(int numberOfGeneralPurposeRegisters) {
+        GPRegisters = new byte[numberOfGeneralPurposeRegisters];
     }
 
     public byte getGeneralPurposeRegister(int registerNumber) {
-        return 0;
+
+        return GPRegisters[registerNumber];
     }
 
-    public void setGeneralPurposeRegister(int registerNumber, int value) {
-
+    public void setGeneralPurposeRegister(int registerNumber, byte value) {
+        GPRegisters[registerNumber] = value;
     }
 
-    public short getProgramCounter() {
-        return 0;
+    public static short getProgramCounter() {
+        return PC;
     }
 
-    public void setProgramCounter(short value) {
-
+    public static void setProgramCounter(short value) {
+        PC = value;
     }
 
     public void incrementProgramCounter() {
-
+        PC++;
     }
 
-    public byte getStatusRegister() {
-        return 0;
-    }
-
-    public void setStatusRegister(byte value) {
-
+    public SREG getStatusRegister() {
+        return sreg;
     }
 
     public boolean getCarryFlag() {
-        return false;
+        return SREG.isCarryFlag();
     }
 
     public void setCarryFlag(boolean value) {
-
+        SREG.setCarryFlag(value);
     }
 
     public boolean get2sComplementOverflowFlag() {
-        return false;
+        return SREG.isOverflowFlag();
     }
 
     public void set2sComplementOverflowFlag(boolean value) {
-
+        SREG.setOverflowFlag(value);
     }
 
     public boolean getSignFlag() {
-        return false;
+        return SREG.isSignFLag();
     }
 
     public void setSignFlag(boolean value) {
-
+        SREG.setSignFLag(value);
     }
 
     public boolean getZeroFlag() {
-        return false;
+        return SREG.isZeroFlag();
     }
 
     public void setZeroFlag(boolean value) {
-
+        SREG.setZeroFlag(value);
     }
 }
