@@ -46,7 +46,8 @@ public class Computer {
     }
 
     private DecodeOutput decode(FetchOutput fetchOutput) {
-        return null;
+        short instruction = fetch().instruction;
+        return  new DecodeOutput(instruction);
     }
 
     public static class DecodeOutput {
@@ -54,9 +55,30 @@ public class Computer {
         public short r1;
         public short r2;
         public short immediate;
+        public boolean isBranch ;
+        public DecodeOutput (short instruction) {
+            short maskOpCode = (short)0b1111000000000000 ;
+            opcode = (short) (instruction & maskOpCode);
+            opcode =(short) (opcode >> 12) ;
+            short  maskR1Code  = (short) 0b0000111111000000;
+            r1 = (short) (instruction & maskR1Code);
+            r1 = (short)(r1>>6);
+            switch (opcode) {
+                case 4 : isBranch = true ;
+                case 3 :
+                case 8 :
+                case 9 :
+                case 10 :
+                case 11 : immediate =(short)(0b0000000000111111 & instruction);break;
+                default:r2 = (short)(0b0000000000111111 & instruction);break;
+            }
+
+        }
     }
 
     private void execute(DecodeOutput decodeOutput) {
 
     }
+
+
 }
