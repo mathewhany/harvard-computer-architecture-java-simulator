@@ -61,7 +61,7 @@ public class Computer {
 
     private DecodeOutput decode(FetchOutput fetchOutput) {
         short instruction = fetch().instruction;
-        return  new DecodeOutput(instruction);
+        return  new DecodeOutput(instruction,registerFile);
     }
 
     public static class DecodeOutput {
@@ -70,7 +70,7 @@ public class Computer {
         public short r2;
         public short immediate;
         public boolean isBranch ;
-        public DecodeOutput (short instruction) {
+        public DecodeOutput (short instruction, RegisterFile registerFile) {
             short maskOpCode = (short)0b1111000000000000 ;
             opcode = (short) (instruction & maskOpCode);
             opcode =(short) (opcode >> 12) ;
@@ -86,6 +86,8 @@ public class Computer {
                 case 11 : immediate =(short)(0b0000000000111111 & instruction);break;
                 default:r2 = (short)(0b0000000000111111 & instruction);break;
             }
+            short DataReg1 = registerFile.getGeneralPurposeRegister(r1);
+            short DataReg2 = registerFile.getGeneralPurposeRegister(r2);
 
         }
     }
