@@ -3,7 +3,7 @@ package ca.memory;
 public class RegisterFile {
     final private byte[] GPRegisters;
     private SREG sreg;
-    private static short PC;
+    private short PC;
 
     public RegisterFile(int numberOfGeneralPurposeRegisters) {
         GPRegisters = new byte[numberOfGeneralPurposeRegisters];
@@ -16,18 +16,21 @@ public class RegisterFile {
 
     public void setGeneralPurposeRegister(int registerNumber, byte value) {
         GPRegisters[registerNumber] = value;
+        System.out.println("Register R" + registerNumber + " set to" + value);
     }
 
-    public static short getProgramCounter() {
+    public Short getProgramCounter() {
         return PC;
     }
 
-    public static void setProgramCounter(short value) {
+    public void setProgramCounter(short value) {
         PC = value;
+        System.out.println("PC new value : " + value);
     }
 
     public void incrementProgramCounter() {
         PC++;
+        System.out.println("PC new value : " + PC);
     }
 
     public SREG getStatusRegister() {
@@ -40,6 +43,7 @@ public class RegisterFile {
 
     public void setCarryFlag(boolean value) {
         SREG.setCarryFlag(value);
+        System.out.println("Carry flag set to : " + value);
     }
 
     public boolean get2sComplementOverflowFlag() {
@@ -48,6 +52,7 @@ public class RegisterFile {
 
     public void set2sComplementOverflowFlag(boolean value) {
         SREG.setOverflowFlag(value);
+        System.out.println("Overflow flag set to : " + value);
     }
 
     public boolean getSignFlag() {
@@ -56,6 +61,7 @@ public class RegisterFile {
 
     public void setSignFlag(boolean value) {
         SREG.setSignFLag(value);
+        System.out.println("Sign flag set to : " + value);
     }
 
     public boolean getZeroFlag() {
@@ -64,5 +70,12 @@ public class RegisterFile {
 
     public void setZeroFlag(boolean value) {
         SREG.setZeroFlag(value);
+        System.out.println("Zero flag set to : " + value);
+    }
+
+    public void printAllRegisters(){
+        for(int i = 0; i<GPRegisters.length;i++){
+            System.out.println("Register : R" + i + " Value : " + getGeneralPurposeRegister(i));
+        }
     }
 }

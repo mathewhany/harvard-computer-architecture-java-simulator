@@ -38,7 +38,21 @@ public class Computer {
     }
 
     private FetchOutput fetch() {
-        return null;
+          if(registerFile.getProgramCounter() == null)
+           {
+               System.out.println("All instructions fetched");
+                 return null;
+           }
+              else
+            {
+
+                FetchOutput out = new FetchOutput();
+                out.instruction = instructionMemory.read(registerFile.getProgramCounter());
+                System.out.println("Instruction" + registerFile.getProgramCounter() + "fetched");
+                System.out.println("Instruction : " + Integer.toBinaryString(out.instruction));
+                registerFile.setProgramCounter((short) (registerFile.getProgramCounter() + 1));
+                return out;
+            }
     }
 
     public static class FetchOutput {

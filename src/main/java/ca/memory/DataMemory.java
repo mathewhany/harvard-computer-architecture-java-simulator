@@ -16,5 +16,11 @@ public class DataMemory {
     public void write(int address, byte value) {
 
         memoryArray[address] = value;
+        System.out.println("Value" + value + "was written to" + "address" + address);
+    }
+    public void printDataMemory(){
+        for(int i = 0; i<memoryArray.length;i++){
+            System.out.println("Data memory address : " + i + " Value : " + read(i));
+        }
     }
 }

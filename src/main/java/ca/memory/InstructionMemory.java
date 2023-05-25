@@ -2,8 +2,6 @@ package ca.memory;
 
 public class InstructionMemory {
     static private Short[] memoryArray;
-    private PipelineReg fetchDecode;
-    private PipelineReg decodeExecute;
 
     public InstructionMemory(int size) {
 
@@ -18,6 +16,7 @@ public class InstructionMemory {
     public void write(int address, short value) {
 
         memoryArray[address] = value;
+        System.out.println("Value" + value + "was written to" + "address" + address);
     }
 
     public void loadProgram(short[] instructions) {
@@ -34,22 +33,9 @@ public class InstructionMemory {
         int size = memoryArray.length;
         memoryArray = new Short[size];
     }
-
-    public void fetch(){
-        if(memoryArray[RegisterFile.getProgramCounter()] == null)
-        {
-            System.out.println("All instructions fetched");
-            fetchDecode.setReady(false);
-            return;
+    public void printDataMemory(){
+        for(int i = 0; i<memoryArray.length;i++){
+            System.out.println("Instruction memory address : " + i + " Value : " + read(i));
         }
-        else
-        {
-            fetchDecode.setCurrentInstruction(memoryArray[RegisterFile.getProgramCounter()]);
-            fetchDecode.setReady(true);
-            System.out.println("Instruction" + RegisterFile.getProgramCounter() + "fetched");
-            RegisterFile.setProgramCounter((short) (RegisterFile.getProgramCounter()+1));
-        }
-
     }
-
 }
