@@ -11,9 +11,9 @@ public class Computer {
     private final RegisterFile registerFile;
 
     public Computer(
-        InstructionMemory instructionMemory,
-        DataMemory dataMemory,
-        RegisterFile registerFile
+            InstructionMemory instructionMemory,
+            DataMemory dataMemory,
+            RegisterFile registerFile
     ) {
         this.instructionMemory = instructionMemory;
         this.dataMemory = dataMemory;
@@ -38,21 +38,18 @@ public class Computer {
     }
 
     private FetchOutput fetch() {
-          if(registerFile.getProgramCounter() == null)
-           {
-               System.out.println("All instructions fetched");
-                 return null;
-           }
-              else
-            {
+        if (registerFile.getProgramCounter() == null) {
+            System.out.println("All instructions fetched");
+            return null;
+        } else {
 
-                FetchOutput out = new FetchOutput();
-                out.instruction = instructionMemory.read(registerFile.getProgramCounter());
-                System.out.println("Instruction" + registerFile.getProgramCounter() + "fetched");
-                System.out.println("Instruction : " + Integer.toBinaryString(out.instruction));
-                registerFile.setProgramCounter((short) (registerFile.getProgramCounter() + 1));
-                return out;
-            }
+            FetchOutput out = new FetchOutput();
+            out.instruction = instructionMemory.read(registerFile.getProgramCounter());
+            System.out.println("Instruction" + registerFile.getProgramCounter() + "fetched");
+            System.out.println("Instruction : " + Integer.toBinaryString(out.instruction));
+            registerFile.setProgramCounter((short) (registerFile.getProgramCounter() + 1));
+            return out;
+        }
     }
 
     public static class FetchOutput {
@@ -60,30 +57,35 @@ public class Computer {
     }
 
     private DecodeOutput decode(FetchOutput fetchOutput) {
-        short opcode ;
-        short r1 = 0  ;
-        short r2= 0 ;
-        short immediate  =  0 ;
-        boolean isBranch =false  ;
+        short opcode;
+        short r1 = 0;
+        short r2 = 0;
+        short immediate = 0;
+        boolean isBranch = false;
         short instruction = fetchOutput.instruction;
-        short maskOpCode = (short)0b1111000000000000 ;
+        short maskOpCode = (short) 0b1111000000000000;
         opcode = (short) (instruction & maskOpCode);
-        opcode =(short) (opcode >> 12) ;
-        short  maskR1Code  = (short) 0b0000111111000000;
+        opcode = (short) (opcode >> 12);
+        short maskR1Code = (short) 0b0000111111000000;
         r1 = (short) (instruction & maskR1Code);
-        r1 = (short)(r1>>6);
+        r1 = (short) (r1 >> 6);
         switch (opcode) {
-            case 4 : isBranch = true ;
-            case 3 :
-            case 8 :
-            case 9 :
-            case 10 :
-            case 11 : immediate =(short)(0b0000000000111111 & instruction);break;
-            default:r2 = (short)(0b0000000000111111 & instruction);break;
+            case 4:
+                isBranch = true;
+            case 3:
+            case 8:
+            case 9:
+            case 10:
+            case 11:
+                immediate = (short) (0b0000000000111111 & instruction);
+                break;
+            default:
+                r2 = (short) (0b0000000000111111 & instruction);
+                break;
         }
         byte r1Data = registerFile.getGeneralPurposeRegister(r1);
         byte r2Data = registerFile.getGeneralPurposeRegister(r2);
-        return new DecodeOutput(opcode,r1Data,r2Data,immediate,isBranch);
+        return new DecodeOutput(opcode, r1Data, r2Data, immediate, isBranch, r1, r2);
 
     }
 
@@ -92,30 +94,91 @@ public class Computer {
         public short r1Data;
         public short r2Data;
         public short immediate;
-        public boolean isBranch ;
+        public boolean isBranch;
+        public short r1;
+        public short r2;
+
         public DecodeOutput
                 (short opcode
-                , short r1Data
-                , short r2Data
-                , short immediate
-                , boolean isBranch
-                )
-        {
-            this.opcode = opcode ;
-            this.r1Data  = r1Data;
+                        , short r1Data
+                        , short r2Data
+                        , short immediate
+                        , boolean isBranch
+                        , short r1
+                        , short r2
+                ) {
+            this.opcode = opcode;
+            this.r1Data = r1Data;
             this.r2Data = r2Data;
             this.immediate = immediate;
             this.isBranch = isBranch;
+            this.r1 = r1;
+            this.r2 = r2;
 
         }
-
 
 
     }
 
     private void execute(DecodeOutput decodeOutput) {
-
+        int r = 0;
+        switch (decodeOutput.opcode) {
+            case 0:
+                r = decodeOutput.r1Data + decodeOutput.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+            case 1:
+                r = decodeOutput.r1Data - decodeOutput.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+            case 2:
+                r = decodeOutput.r1Data * decodeOutput.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+            case 3:
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) (decodeOutput.immediate));
+            case 4:
+                if (decodeOutput.r1Data == 0) {
+                    registerFile.setProgramCounter((short) (registerFile.getProgramCounter() + 1 + decodeOutput.immediate));
+                }
+            case 5:
+                r = decodeOutput.r1Data & decodeOutput.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+            case 6:
+                r = decodeOutput.r1Data | decodeOutput.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+            case 7:
+                registerFile.setProgramCounter(Short.parseShort(String.valueOf(decodeOutput.r1Data).concat(String.valueOf(decodeOutput.r2Data))));
+            case 8:
+                r = (decodeOutput.r1Data << decodeOutput.immediate) | (decodeOutput.r1Data >>> (8 - decodeOutput.immediate));
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+            case 9:
+                r = (decodeOutput.r1Data >>> decodeOutput.immediate) | (decodeOutput.r1Data << (8 - decodeOutput.immediate));
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+            case 10:
+                registerFile.setGeneralPurposeRegister(decodeOutput.r1, dataMemory.read(decodeOutput.immediate));
+            default:
+                dataMemory.write(decodeOutput.immediate, (byte) (decodeOutput.r1Data));
+        }
+        if (decodeOutput.opcode == 0 || decodeOutput.opcode == 1 || decodeOutput.opcode == 2 || decodeOutput.opcode == 5 || decodeOutput.opcode == 6 || decodeOutput.opcode == 8 || decodeOutput.opcode == 9) {
+            registerFile.setZeroFlag(r == 0);
+            registerFile.setNegativeFlag(r < 0);
+        }
+        if (decodeOutput.opcode == 0) {
+            if (r > 255) {
+                registerFile.setCarryFlag(true);
+            }
+            if ((decodeOutput.r1Data >= 0 && decodeOutput.r2Data >= 0) || (decodeOutput.r1Data < 0 && decodeOutput.r2Data < 0)) {
+                if ((decodeOutput.r2Data >= 0 && r < 0) || (decodeOutput.r2Data < 0 && r >= 0)) {
+                    registerFile.set2sComplementOverflowFlag(true);
+                }
+                registerFile.setSignFlag((r == 0) ^ (r < 0));
+            }
+            if (decodeOutput.opcode == 1) {
+                if ((decodeOutput.r1Data >= 0 && decodeOutput.r2Data < 0) || (decodeOutput.r1Data < 0 && decodeOutput.r2Data >= 0)) {
+                    if ((decodeOutput.r2Data >= 0 && r >= 0) || (decodeOutput.r2Data < 0 && r < 0)) {
+                        registerFile.set2sComplementOverflowFlag(true);
+                    }
+                }
+                registerFile.setSignFlag((r == 0) ^ (r < 0));
+            }
+        }
     }
-
-
 }

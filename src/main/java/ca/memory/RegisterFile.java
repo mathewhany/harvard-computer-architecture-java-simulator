@@ -55,6 +55,13 @@ public class RegisterFile {
         System.out.println("Overflow flag set to : " + value);
     }
 
+    public boolean getNegativeFlag() { return SREG.isNegativeFlag(); }
+
+    public void setNegativeFlag(boolean value) {
+        SREG.setNegativeFlag(value);
+        System.out.println("Negative flag set to : " + value);
+    }
+
     public boolean getSignFlag() {
         return SREG.isSignFLag();
     }
