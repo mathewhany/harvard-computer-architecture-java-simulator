@@ -1,8 +1,10 @@
 package ca.memory;
 
+import ca.BitUtils;
+
 public class RegisterFile {
     final private byte[] gpRegisters;
-    private SREG sreg;
+    private byte statusReg;
     private short pc;
 
     public RegisterFile(int numberOfGeneralPurposeRegisters) {
@@ -31,52 +33,53 @@ public class RegisterFile {
         setProgramCounter((short) (getProgramCounter() + 1));
     }
 
-    public SREG getStatusRegister() {
-        return sreg;
+    public byte getStatusRegister() {
+        return statusReg;
     }
 
     public boolean getCarryFlag() {
-        return SREG.isCarryFlag();
+
+        return (BitUtils.getBit(statusReg,4) == 1);
     }
 
     public void setCarryFlag(boolean value) {
-        SREG.setCarryFlag(value);
+        statusReg = BitUtils.setBit(statusReg,4,value);
         System.out.println("Carry flag set to: " + value);
     }
 
     public boolean get2sComplementOverflowFlag() {
-        return SREG.isOverflowFlag();
+        return (BitUtils.getBit(statusReg,3)==1);
     }
 
     public void set2sComplementOverflowFlag(boolean value) {
-        SREG.setOverflowFlag(value);
+        statusReg = BitUtils.setBit(statusReg,3,value);
         System.out.println("Overflow flag set to: " + value);
     }
 
     public boolean getNegativeFlag() {
-        return SREG.isNegativeFlag();
+        return (BitUtils.getBit(statusReg,2)==1);
     }
 
     public void setNegativeFlag(boolean value) {
-        SREG.setNegativeFlag(value);
+        statusReg = BitUtils.setBit(statusReg,2,value);
         System.out.println("Negative flag set to: " + value);
     }
 
     public boolean getSignFlag() {
-        return SREG.isSignFLag();
+        return (BitUtils.getBit(statusReg,1)==1);
     }
 
     public void setSignFlag(boolean value) {
-        SREG.setSignFLag(value);
+        statusReg = BitUtils.setBit(statusReg,1,value);
         System.out.println("Sign flag set to: " + value);
     }
 
     public boolean getZeroFlag() {
-        return SREG.isZeroFlag();
+        return (BitUtils.getBit(statusReg,0)==1);
     }
 
     public void setZeroFlag(boolean value) {
-        SREG.setZeroFlag(value);
+        statusReg = BitUtils.setBit(statusReg,0,value);
         System.out.println("Zero flag set to: " + value);
     }
 
@@ -88,7 +91,7 @@ public class RegisterFile {
             System.out.println("R" + i + " = " + getGeneralPurposeRegister(i));
         }
         System.out.println("PC = " + getProgramCounter());
-//        System.out.println("SREG = " + getStatusRegister());
+        System.out.println("SREG = " + BitUtils.toBinaryString(getStatusRegister(),8));
         System.out.println("################################################");
         System.out.println();
         System.out.println();

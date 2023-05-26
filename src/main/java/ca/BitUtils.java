@@ -15,11 +15,11 @@ public class BitUtils {
         return getBits(value, index, index);
     }
 
-    public static short setBit(short value, int index, boolean bit) {
+    public static byte setBit(byte value, int index, boolean bit) {
         if (bit) {
-            return (short) (value | (1 << index));
+            return (byte) (value | (1 << index));
         } else {
-            return (short) (value & ~(1 << index));
+            return (byte) (value & ~(1 << index));
         }
     }
 
