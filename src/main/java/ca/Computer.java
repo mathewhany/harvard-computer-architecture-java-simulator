@@ -3,6 +3,7 @@ package ca;
 import ca.memory.DataMemory;
 import ca.memory.InstructionMemory;
 import ca.memory.RegisterFile;
+import ca.parser.AssemblyInstructionParser;
 import ca.parser.InstructionParser;
 import ca.parser.ProgramLoader;
 
@@ -14,7 +15,7 @@ public class Computer {
     private final RegisterFile registerFile;
     private final InstructionParser instructionParser;
 
-    private FetchDecodePipelineRegister fetchDecode;
+    public FetchDecodePipelineRegister fetchDecode;
     private DecodeExecutePipelineRegister decodeExecute;
 
     private int clock;
@@ -130,36 +131,17 @@ public class Computer {
         }
     }
 
-    private DecodeExecutePipelineRegister decode() {
+    public DecodeExecutePipelineRegister decode() {
         if (fetchDecode == null) return null;
 
-        short opcode;
-        short r1 = 0;
-        short r2 = 0;
-        short immediate = 0;
         boolean isBranch = false;
         short instruction = fetchDecode.instruction;
-        short maskOpCode = (short) 0b1111000000000000;
-        opcode = (short) (instruction & maskOpCode);
-        opcode = (short) (opcode >> 12);
-        short maskR1Code = (short) 0b0000111111000000;
-        r1 = (short) (instruction & maskR1Code);
-        r1 = (short) (r1 >> 6);
-
-        switch (opcode) {
-            case 4:
-                isBranch = true;
-            case 3:
-            case 8:
-            case 9:
-            case 10:
-            case 11:
-                immediate = (short) (0b0000000000111111 & instruction);
-                break;
-            default:
-                r2 = (short) (0b0000000000111111 & instruction);
-                break;
-        }
+        short  opcode = (short)BitUtils.getBits(instruction,12,15);
+        short r1 = (short)BitUtils.getBits(instruction,6,11);
+        short r2 = (short)BitUtils.getBits(instruction,0,5);
+        short immediate = (short)BitUtils.getBits(instruction,0,5);
+        if (opcode == Opcode.BEQZ)
+            isBranch = true;
 
         byte r1Data = registerFile.getGeneralPurposeRegister(r1);
         byte r2Data = registerFile.getGeneralPurposeRegister(r2);
@@ -331,5 +313,30 @@ public class Computer {
             registerFile.setSignFlag(
                 registerFile.getNegativeFlag() ^ registerFile.get2sComplementOverflowFlag());
         }
+    }
+
+    public  static void main(String[] args) {
+        short instruction = (short)0b1011000000000000;
+        System.out.println(Integer.toBinaryString(instruction));
+        System.out.println(Integer.toBinaryString(BitUtils.getBits(instruction,0,5)));
+        System.out.println(Integer.toBinaryString(BitUtils.getBits(instruction,6,11)));
+        System.out.println(Integer.toBinaryString(BitUtils.getBits(instruction,12,15)));
+        int instructionMemorySize = 1024;
+        int dataMemorySize = 2048;
+        int generalPurposeRegisterCount = 64;
+        String programPath = "src/main/resources/program.txt";
+
+        Computer computer = new Computer(
+                new InstructionMemory(instructionMemorySize),
+                new DataMemory(dataMemorySize),
+                new RegisterFile(generalPurposeRegisterCount),
+                new AssemblyInstructionParser()
+        );
+        computer.fetchDecode = new FetchDecodePipelineRegister(0,instruction);
+        DecodeExecutePipelineRegister decodeExecutePipelineRegister = computer.decode();
+        System.out.println(Integer.toBinaryString(decodeExecutePipelineRegister.r2));
+        System.out.println(Integer.toBinaryString(decodeExecutePipelineRegister.r1));
+        System.out.println(Integer.toBinaryString(decodeExecutePipelineRegister.opcode));
+
     }
 }
