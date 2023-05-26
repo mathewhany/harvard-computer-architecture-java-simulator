@@ -14,6 +14,7 @@ public class Computer {
     private final DataMemory dataMemory;
     private final RegisterFile registerFile;
     private final InstructionParser instructionParser;
+    private final ALU alu;
 
     private FetchDecodePipelineRegister fetchDecode;
     private DecodeExecutePipelineRegister decodeExecute;
@@ -28,6 +29,8 @@ public class Computer {
         this.dataMemory = dataMemory;
         this.registerFile = registerFile;
         this.instructionParser = parser;
+
+        this.alu = new ALU(registerFile);
     }
 
     public void runProgram(ProgramLoader programLoader) throws CaException {
@@ -138,12 +141,62 @@ public class Computer {
         short r1 = (short) BitUtils.getBits(instruction, 6, 11);
         short r2 = (short) BitUtils.getBits(instruction, 0, 5);
         short immediate = (short) BitUtils.getBits(instruction, 0, 5);
+
         if (opcode == Opcode.BEQZ) {
             isBranch = true;
         }
 
         byte r1Data = registerFile.getGeneralPurposeRegister(r1);
         byte r2Data = registerFile.getGeneralPurposeRegister(r2);
+
+        /**
+         * True for Opcode.JR only
+         */
+        boolean isJump = opcode == Opcode.JR;
+
+        /**
+         * Opcode.ADD -> ALU.ADD
+         * Opcode.SUB -> ALU.SUB
+         * Opcode.MUL -> ALU.MUL
+         * Opcode.AND -> ALU.AND
+         * Opcode.OR -> ALU.OR
+         * Opcode.SLC -> ALU.SLC
+         * Opcode.SRL -> ALU.SRL
+         * Opcode.SB, Opcode.LB, Opcode.LDI, Opcode.BEQZ -> ALU.TRANSFER
+         * Opcode.JR -> ALU.CONCAT
+         */
+        int aluOpcode = ALU.ADD;
+
+        /**
+         * True for Opcode.SB only
+         */
+        boolean memoryWrite = false;
+
+        /**
+         * True for Opcode.LB only
+         */
+        boolean memoryRead = false;
+
+        /**
+         * The ALU will always be given R1 as a first operand,
+         * and aluSrc as the second operand.
+         *
+         * For Opcode.ADD, Opcode.SUB, Opcode.MUL, Opcode.AND, Opcode.OR, Opcode.JR -> aluSrc = R2
+         * For Opcode.SLC, Opcode.SRC, Opcode.LDI, Opcode.BEQZ, Opcode.SB, Opcode.LB -> aluSrc = immediate
+         */
+        short aluSrc = 0;
+
+        /**
+         * True for Opcode.SB only
+         */
+        boolean writeMemoryToRegister = false;
+
+
+        /**
+         * True for Opcode.ADD, Opcode.SUB, Opcode.MUL, Opcode.AND, Opcode.OR, Opcode.SLC, Opcode.SRL, Opcode.LDI, Opcode.LB -> regWrite = true
+         * True for Opcode.JR, Opcode.SB, Opcode.BEQZ -> regWrite = false
+         */
+        boolean regWrite = true;
 
         return new DecodeExecutePipelineRegister(
             fetchDecode.instructionAddress,
@@ -152,8 +205,15 @@ public class Computer {
             r2Data,
             immediate,
             isBranch,
+            isJump,
             r1,
-            r2
+            r2,
+            aluOpcode,
+            memoryWrite,
+            memoryRead,
+            aluSrc,
+            writeMemoryToRegister,
+            regWrite
         );
 
     }
@@ -161,22 +221,36 @@ public class Computer {
     public static class DecodeExecutePipelineRegister {
         public int instructionAddress;
         public short opcode;
-        public short r1Data;
-        public short r2Data;
+        public byte r1Data;
+        public byte r2Data;
         public short immediate;
         public boolean isBranch;
+        public boolean isJump;
         public short r1;
         public short r2;
+        public int aluOpcode;
+        public boolean memoryWrite;
+        public boolean memoryRead;
+        public short aluSrc;
+        public boolean writeMemoryToRegister;
+        public boolean regWrite;
 
         public DecodeExecutePipelineRegister(
             int instructionAddress,
             short opcode,
-            short r1Data,
-            short r2Data,
+            byte r1Data,
+            byte r2Data,
             short immediate,
             boolean isBranch,
+            boolean isJump,
             short r1,
-            short r2
+            short r2,
+            int aluOpcode,
+            boolean memoryWrite,
+            boolean memoryRead,
+            short aluSrc,
+            boolean writeMemoryToRegister,
+            boolean regWrite
         ) {
             this.instructionAddress = instructionAddress;
             this.opcode = opcode;
@@ -184,133 +258,76 @@ public class Computer {
             this.r2Data = r2Data;
             this.immediate = immediate;
             this.isBranch = isBranch;
+            this.isJump = isJump;
             this.r1 = r1;
             this.r2 = r2;
+            this.aluOpcode = aluOpcode;
+            this.memoryWrite = memoryWrite;
+            this.memoryRead = memoryRead;
+            this.aluSrc = aluSrc;
+            this.writeMemoryToRegister = writeMemoryToRegister;
+            this.regWrite = regWrite;
         }
+
 
         @Override
         public String toString() {
-            return "Decode Execute Pipeline Register { " +
+            return "Decode Execute Pipeline Register {" +
                    "opcode=" + opcode +
-                   ", R1 Data=" + r1Data +
-                   ", R2 Data=" + r2Data +
-                   ", Immediate=" + immediate +
-                   ", Is Branch=" + isBranch +
-                   ", R1 =" + r1 +
-                   ", R2 =" + r2 +
+                   ", r1Data=" + r1Data +
+                   ", r2Data=" + r2Data +
+                   ", immediate=" + immediate +
+                   ", isBranch=" + isBranch +
+                   ", isJump=" + isJump +
+                   ", r1=" + r1 +
+                   ", r2=" + r2 +
+                   ", aluOpcode=" + aluOpcode +
+                   ", memoryWrite=" + memoryWrite +
+                   ", memoryRead=" + memoryRead +
+                   ", aluSrc=" + aluSrc +
+                   ", writeMemoryToRegister=" + writeMemoryToRegister +
+                   ", regWrite=" + regWrite +
                    " }";
         }
-
     }
 
-    private void execute() {
+    private void execute() throws CaException {
         if (decodeExecute == null) return;
 
-        int r = 0;
-        switch (decodeExecute.opcode) {
-            case Opcode.ADD:
-                r = decodeExecute.r1Data + decodeExecute.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
-                break;
-            case Opcode.SUB:
-                r = decodeExecute.r1Data - decodeExecute.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
-                break;
-            case Opcode.MUL:
-                r = decodeExecute.r1Data * decodeExecute.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
-                break;
-            case Opcode.LDI:
-                registerFile.setGeneralPurposeRegister(
-                    decodeExecute.r1,
-                    (byte) (decodeExecute.immediate)
-                );
-                break;
-            case Opcode.BEQZ:
-                if (decodeExecute.r1Data == 0) {
-                    registerFile.setProgramCounter((short) (
-                        registerFile.getProgramCounter() + 1 + decodeExecute.immediate
-                    ));
+        short aluResult =
+            alu.execute(decodeExecute.opcode, decodeExecute.r1Data, decodeExecute.aluSrc);
 
-                    fetchDecode = null;
-                    decodeExecute = null;
-                }
-                return;
-            case Opcode.AND:
-                r = decodeExecute.r1Data & decodeExecute.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
-                break;
-            case Opcode.OR:
-                r = decodeExecute.r1Data | decodeExecute.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
-                break;
-            case Opcode.JR:
-                registerFile.setProgramCounter(
-                    Short.parseShort(
-                        String.valueOf(decodeExecute.r1Data)
-                              .concat(String.valueOf(decodeExecute.r2Data))
-                    )
-                );
-                break;
-            case Opcode.SLC:
-                r = (decodeExecute.r1Data << decodeExecute.immediate) |
-                    (decodeExecute.r1Data >>> (8 - decodeExecute.immediate));
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
-                break;
-            case Opcode.SRC:
-                r = (decodeExecute.r1Data >>> decodeExecute.immediate) |
-                    (decodeExecute.r1Data << (8 - decodeExecute.immediate));
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
-                break;
-            case Opcode.LB:
-                registerFile.setGeneralPurposeRegister(
-                    decodeExecute.r1,
-                    dataMemory.read(decodeExecute.immediate)
-                );
-                break;
-            case Opcode.SB:
-                dataMemory.write(decodeExecute.immediate, (byte) (decodeExecute.r1Data));
-                break;
-            default:
-                System.out.println("Invalid opcode " + decodeExecute.opcode);
-                return;
+        byte memoryData = 0;
+
+        if (decodeExecute.memoryRead) {
+            memoryData = dataMemory.read(aluResult);
         }
 
-        if (decodeExecute.opcode == Opcode.ADD ||
-            decodeExecute.opcode == Opcode.SUB ||
-            decodeExecute.opcode == Opcode.MUL ||
-            decodeExecute.opcode == Opcode.AND ||
-            decodeExecute.opcode == Opcode.OR ||
-            decodeExecute.opcode == Opcode.SLC ||
-            decodeExecute.opcode == Opcode.SRC) {
-            registerFile.setZeroFlag(r == 0);
-            registerFile.setNegativeFlag(r < 0);
+        if (decodeExecute.memoryWrite) {
+            dataMemory.write(aluResult, decodeExecute.r1Data);
         }
 
-        if (decodeExecute.opcode == Opcode.ADD) {
-            registerFile.setCarryFlag(BitUtils.getBit(r, 8) == 1);
-
-            if ((decodeExecute.r1Data > 0 && decodeExecute.r2Data > 0) ||
-                (decodeExecute.r1Data < 0 && decodeExecute.r2Data < 0)) {
-                if ((decodeExecute.r2Data > 0 && r < 0) || (decodeExecute.r2Data < 0 && r > 0)) {
-                    registerFile.set2sComplementOverflowFlag(true);
-                }
-                registerFile.setSignFlag(
-                    registerFile.getNegativeFlag() ^ registerFile.get2sComplementOverflowFlag());
+        if (decodeExecute.regWrite) {
+            if (decodeExecute.writeMemoryToRegister) {
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, memoryData);
+            } else {
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, decodeExecute.r2Data);
             }
         }
 
-        if (decodeExecute.opcode == Opcode.SUB) {
-            if ((decodeExecute.r1Data > 0 && decodeExecute.r2Data < 0) ||
-                (decodeExecute.r1Data < 0 && decodeExecute.r2Data > 0)) {
-                if ((decodeExecute.r2Data >= 0 && r >= 0) ||
-                    (decodeExecute.r2Data < 0 && r < 0)) {
-                    registerFile.set2sComplementOverflowFlag(true);
-                }
-            }
 
-            registerFile.setSignFlag(
-                registerFile.getNegativeFlag() ^ registerFile.get2sComplementOverflowFlag());
+        if (decodeExecute.isJump) {
+            registerFile.setProgramCounter(aluResult);
+
+            // Flush the pipeline
+            fetchDecode = null;
+            decodeExecute = null;
+        } else if (decodeExecute.isBranch && decodeExecute.r1Data == 0) {
+            registerFile.setProgramCounter(aluResult);
+
+            // Flush the pipeline
+            fetchDecode = null;
+            decodeExecute = null;
         }
     }
 }
