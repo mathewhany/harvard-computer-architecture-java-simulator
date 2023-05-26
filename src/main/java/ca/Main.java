@@ -28,7 +28,5 @@ public class Main {
         } catch (CaException e) {
             System.err.println(e.getMessage());
         }
-        System.out.println("111100000000000".length());
     }
-
 }

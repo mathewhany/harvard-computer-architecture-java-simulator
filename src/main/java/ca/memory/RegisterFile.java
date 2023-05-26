@@ -1,21 +1,20 @@
 package ca.memory;
 
 public class RegisterFile {
-    final private byte[] GPRegisters;
+    final private byte[] gpRegisters;
     private SREG sreg;
     private short PC;
 
     public RegisterFile(int numberOfGeneralPurposeRegisters) {
-        GPRegisters = new byte[numberOfGeneralPurposeRegisters];
+        gpRegisters = new byte[numberOfGeneralPurposeRegisters];
     }
 
     public byte getGeneralPurposeRegister(int registerNumber) {
-
-        return GPRegisters[registerNumber];
+        return gpRegisters[registerNumber];
     }
 
     public void setGeneralPurposeRegister(int registerNumber, byte value) {
-        GPRegisters[registerNumber] = value;
+        gpRegisters[registerNumber] = value;
         System.out.println("Register R" + registerNumber + " set to" + value);
     }
 
@@ -55,7 +54,9 @@ public class RegisterFile {
         System.out.println("Overflow flag set to : " + value);
     }
 
-    public boolean getNegativeFlag() { return SREG.isNegativeFlag(); }
+    public boolean getNegativeFlag() {
+        return SREG.isNegativeFlag();
+    }
 
     public void setNegativeFlag(boolean value) {
         SREG.setNegativeFlag(value);
@@ -80,8 +81,8 @@ public class RegisterFile {
         System.out.println("Zero flag set to : " + value);
     }
 
-    public void printAllRegisters(){
-        for(int i = 0; i<GPRegisters.length;i++){
+    public void printAllRegisters() {
+        for (int i = 0; i < gpRegisters.length; i++) {
             System.out.println("Register : R" + i + " Value : " + getGeneralPurposeRegister(i));
         }
     }

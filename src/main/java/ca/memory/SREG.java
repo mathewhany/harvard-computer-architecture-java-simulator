@@ -1,7 +1,6 @@
 package ca.memory;
 
 public class SREG {
-
     private static boolean carryFlag;
     private static boolean overflowFlag;
     private static boolean negativeFlag;
