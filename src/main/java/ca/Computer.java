@@ -15,10 +15,8 @@ public class Computer {
     private final RegisterFile registerFile;
     private final InstructionParser instructionParser;
 
-    public FetchDecodePipelineRegister fetchDecode;
+    private FetchDecodePipelineRegister fetchDecode;
     private DecodeExecutePipelineRegister decodeExecute;
-
-    private int clock;
 
     public Computer(
         InstructionMemory instructionMemory,
@@ -38,7 +36,7 @@ public class Computer {
         fetchDecode = null;
         decodeExecute = null;
 
-        clock = 1;
+        int clock = 1;
 
         while (true) {
             System.out.println();
@@ -109,7 +107,7 @@ public class Computer {
 
         FetchDecodePipelineRegister out = new FetchDecodePipelineRegister(pc, instruction);
         System.out.println("Instruction #" + pc + " fetched");
-        System.out.println("Instruction Binary: " + Integer.toBinaryString(instruction));
+        System.out.println("Instruction Binary: " + BitUtils.toBinaryString(instruction, 16));
         registerFile.incrementProgramCounter();
         return out;
     }
@@ -131,17 +129,18 @@ public class Computer {
         }
     }
 
-    public DecodeExecutePipelineRegister decode() {
+    private DecodeExecutePipelineRegister decode() {
         if (fetchDecode == null) return null;
 
         boolean isBranch = false;
         short instruction = fetchDecode.instruction;
-        short  opcode = (short)BitUtils.getBits(instruction,12,15);
-        short r1 = (short)BitUtils.getBits(instruction,6,11);
-        short r2 = (short)BitUtils.getBits(instruction,0,5);
-        short immediate = (short)BitUtils.getBits(instruction,0,5);
-        if (opcode == Opcode.BEQZ)
+        short opcode = (short) BitUtils.getBits(instruction, 12, 15);
+        short r1 = (short) BitUtils.getBits(instruction, 6, 11);
+        short r2 = (short) BitUtils.getBits(instruction, 0, 5);
+        short immediate = (short) BitUtils.getBits(instruction, 0, 5);
+        if (opcode == Opcode.BEQZ) {
             isBranch = true;
+        }
 
         byte r1Data = registerFile.getGeneralPurposeRegister(r1);
         byte r2Data = registerFile.getGeneralPurposeRegister(r2);
@@ -313,30 +312,5 @@ public class Computer {
             registerFile.setSignFlag(
                 registerFile.getNegativeFlag() ^ registerFile.get2sComplementOverflowFlag());
         }
-    }
-
-    public  static void main(String[] args) {
-        short instruction = (short)0b1011000000000000;
-        System.out.println(Integer.toBinaryString(instruction));
-        System.out.println(Integer.toBinaryString(BitUtils.getBits(instruction,0,5)));
-        System.out.println(Integer.toBinaryString(BitUtils.getBits(instruction,6,11)));
-        System.out.println(Integer.toBinaryString(BitUtils.getBits(instruction,12,15)));
-        int instructionMemorySize = 1024;
-        int dataMemorySize = 2048;
-        int generalPurposeRegisterCount = 64;
-        String programPath = "src/main/resources/program.txt";
-
-        Computer computer = new Computer(
-                new InstructionMemory(instructionMemorySize),
-                new DataMemory(dataMemorySize),
-                new RegisterFile(generalPurposeRegisterCount),
-                new AssemblyInstructionParser()
-        );
-        computer.fetchDecode = new FetchDecodePipelineRegister(0,instruction);
-        DecodeExecutePipelineRegister decodeExecutePipelineRegister = computer.decode();
-        System.out.println(Integer.toBinaryString(decodeExecutePipelineRegister.r2));
-        System.out.println(Integer.toBinaryString(decodeExecutePipelineRegister.r1));
-        System.out.println(Integer.toBinaryString(decodeExecutePipelineRegister.opcode));
-
     }
 }

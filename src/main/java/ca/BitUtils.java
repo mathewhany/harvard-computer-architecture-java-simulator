@@ -14,4 +14,22 @@ public class BitUtils {
     public static int getBit(int value, int index) {
         return getBits(value, index, index);
     }
+
+    public static short setBit(short value, int index, boolean bit) {
+        if (bit) {
+            return (short) (value | (1 << index));
+        } else {
+            return (short) (value & ~(1 << index));
+        }
+    }
+
+    public static String toBinaryString(int value, int length) {
+        String binaryString = Integer.toBinaryString(value);
+
+        while (binaryString.length() < length) {
+            binaryString = "0" + binaryString;
+        }
+
+        return binaryString;
+    }
 }
