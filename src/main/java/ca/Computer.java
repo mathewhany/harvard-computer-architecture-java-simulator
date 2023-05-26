@@ -165,17 +165,31 @@ public class Computer {
          * Opcode.SB, Opcode.LB, Opcode.LDI, Opcode.BEQZ -> ALU.TRANSFER
          * Opcode.JR -> ALU.CONCAT
          */
-        int aluOpcode = ALU.ADD;
+        int aluOpcode = opcode;
+        switch (opcode) {
+            case Opcode.SB:
+            case Opcode.LB:
+            case Opcode.LDI:
+            case Opcode.BEQZ: aluOpcode = ALU.TRANSFER ;  break;
+            case Opcode.ADD: aluOpcode = ALU.ADD ; break ;
+            case Opcode.SUB:  aluOpcode = ALU.SUB ; break ;
+            case Opcode.MUL: aluOpcode = ALU.MUL ; break ;
+            case Opcode.AND:aluOpcode =ALU.ADD ;break ;
+            case Opcode.OR : aluOpcode = ALU.OR ; break ;
+            case Opcode.SLC: aluOpcode = ALU.SLC ; break ;
+            case Opcode.SRC: aluOpcode = ALU.SRC; break ;
+            default:aluOpcode =ALU.CONCAT ;
+        }
 
         /**
          * True for Opcode.SB only
          */
-        boolean memoryWrite = false;
+        boolean memoryWrite = opcode == Opcode.SB;
 
         /**
          * True for Opcode.LB only
          */
-        boolean memoryRead = false;
+        boolean memoryRead = opcode == Opcode.LB;
 
         /**
          * The ALU will always be given R1 as a first operand,
@@ -185,11 +199,20 @@ public class Computer {
          * For Opcode.SLC, Opcode.SRC, Opcode.LDI, Opcode.BEQZ, Opcode.SB, Opcode.LB -> aluSrc = immediate
          */
         short aluSrc = 0;
+        switch (opcode) {
+            case Opcode.AND:
+            case Opcode.SUB:
+            case Opcode.MUL:
+            case Opcode.ADD:
+            case Opcode.OR:
+            case Opcode.JR:aluSrc = r2 ; break;
+            default:aluSrc = immediate ; break;
+        }
 
         /**
          * True for Opcode.SB only
          */
-        boolean writeMemoryToRegister = false;
+        boolean writeMemoryToRegister = opcode == Opcode.LB;
 
 
         /**
@@ -197,6 +220,11 @@ public class Computer {
          * True for Opcode.JR, Opcode.SB, Opcode.BEQZ -> regWrite = false
          */
         boolean regWrite = true;
+        switch (opcode) {
+            case Opcode.JR:
+            case Opcode.SB:
+            case Opcode.BEQZ:regWrite = false ;break;
+        }
 
         return new DecodeExecutePipelineRegister(
             fetchDecode.instructionAddress,
