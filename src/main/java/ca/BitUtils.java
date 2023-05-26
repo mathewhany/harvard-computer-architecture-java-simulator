@@ -26,6 +26,10 @@ public class BitUtils {
     public static String toBinaryString(int value, int length) {
         String binaryString = Integer.toBinaryString(value);
 
+        if (binaryString.length() > length) {
+            return binaryString.substring(binaryString.length() - length);
+        }
+
         while (binaryString.length() < length) {
             binaryString = "0" + binaryString;
         }

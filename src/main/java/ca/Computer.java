@@ -34,7 +34,7 @@ public class Computer {
     }
 
     public void runProgram(ProgramLoader programLoader) throws CaException {
-        int programSize = loadProgram(programLoader);
+        loadProgram(programLoader);
 
         fetchDecode = null;
         decodeExecute = null;
@@ -51,9 +51,9 @@ public class Computer {
             printPipelineRegisters("Pipeline registers at start of cycle " + clock);
 
             FetchDecodePipelineRegister nextFetchOutput = fetch();
+            execute();
             DecodeExecutePipelineRegister nextDecodeExecute = decode();
 
-            execute();
 
             fetchDecode = nextFetchOutput;
             decodeExecute = nextDecodeExecute;
@@ -77,7 +77,10 @@ public class Computer {
     }
 
     private void printInstructionsAtStages() {
-        System.out.println("Instruction At Fetch: " + registerFile.getProgramCounter());
+        boolean hasFetch = instructionMemory.read(registerFile.getProgramCounter()) != null;
+
+        System.out.println(
+            "Instruction At Fetch: " + (hasFetch ? registerFile.getProgramCounter() : "None"));
         System.out.println("Instruction At Decode: " +
                            (fetchDecode != null ? fetchDecode.instructionAddress : "None"));
         System.out.println("Instruction At Execute: " +
@@ -92,25 +95,25 @@ public class Computer {
             decodeExecute == null ? "Decode Execute register is empty" : decodeExecute);
     }
 
-    private int loadProgram(ProgramLoader programLoader) throws CaException {
+    private void loadProgram(ProgramLoader programLoader) throws CaException {
         List<String> unparsedInstructions = programLoader.loadProgram();
         short[] parsedInstructions = new short[unparsedInstructions.size()];
         for (int i = 0; i < unparsedInstructions.size(); i++) {
             parsedInstructions[i] = instructionParser.parse(unparsedInstructions.get(i));
         }
         instructionMemory.loadProgram(parsedInstructions);
-        return parsedInstructions.length;
     }
 
     private FetchDecodePipelineRegister fetch() {
         short pc = registerFile.getProgramCounter();
-        short instruction = instructionMemory.read(pc);
+        Short instruction = instructionMemory.read(pc);
 
-        if (instruction == -1) return null;
+        if (instruction == null) return null;
 
         FetchDecodePipelineRegister out = new FetchDecodePipelineRegister(pc, instruction);
         System.out.println("Instruction #" + pc + " fetched");
         System.out.println("Instruction Binary: " + BitUtils.toBinaryString(instruction, 16));
+        System.out.println("Incremented PC to " + (pc + 1) + " in Fetch stage");
         registerFile.incrementProgramCounter();
         return out;
     }
@@ -127,12 +130,12 @@ public class Computer {
         @Override
         public String toString() {
             return "Fetch Decode Pipeline Register { " +
-                   "instruction=" + Integer.toBinaryString(instruction) +
+                   "instruction=" + BitUtils.toBinaryString(instruction, 16) +
                    " }";
         }
     }
 
-    private DecodeExecutePipelineRegister decode() {
+    private DecodeExecutePipelineRegister decode() throws CaException {
         if (fetchDecode == null) return null;
 
         boolean isBranch = false;
@@ -170,15 +173,35 @@ public class Computer {
             case Opcode.SB:
             case Opcode.LB:
             case Opcode.LDI:
-            case Opcode.BEQZ: aluOpcode = ALU.TRANSFER ;  break;
-            case Opcode.ADD: aluOpcode = ALU.ADD ; break ;
-            case Opcode.SUB:  aluOpcode = ALU.SUB ; break ;
-            case Opcode.MUL: aluOpcode = ALU.MUL ; break ;
-            case Opcode.AND:aluOpcode =ALU.ADD ;break ;
-            case Opcode.OR : aluOpcode = ALU.OR ; break ;
-            case Opcode.SLC: aluOpcode = ALU.SLC ; break ;
-            case Opcode.SRC: aluOpcode = ALU.SRC; break ;
-            default:aluOpcode =ALU.CONCAT ;
+            case Opcode.BEQZ:
+                aluOpcode = ALU.TRANSFER;
+                break;
+            case Opcode.ADD:
+                aluOpcode = ALU.ADD;
+                break;
+            case Opcode.SUB:
+                aluOpcode = ALU.SUB;
+                break;
+            case Opcode.MUL:
+                aluOpcode = ALU.MUL;
+                break;
+            case Opcode.AND:
+                aluOpcode = ALU.ADD;
+                break;
+            case Opcode.OR:
+                aluOpcode = ALU.OR;
+                break;
+            case Opcode.SLC:
+                aluOpcode = ALU.SLC;
+                break;
+            case Opcode.SRC:
+                aluOpcode = ALU.SRC;
+                break;
+            case Opcode.JR:
+                aluOpcode = ALU.CONCAT;
+                break;
+            default:
+                throw new CaException("Invalid opcode: " + opcode);
         }
 
         /**
@@ -205,8 +228,12 @@ public class Computer {
             case Opcode.MUL:
             case Opcode.ADD:
             case Opcode.OR:
-            case Opcode.JR:aluSrc = r2 ; break;
-            default:aluSrc = immediate ; break;
+            case Opcode.JR:
+                aluSrc = r2Data;
+                break;
+            default:
+                aluSrc = immediate;
+                break;
         }
 
         /**
@@ -223,7 +250,9 @@ public class Computer {
         switch (opcode) {
             case Opcode.JR:
             case Opcode.SB:
-            case Opcode.BEQZ:regWrite = false ;break;
+            case Opcode.BEQZ:
+                regWrite = false;
+                break;
         }
 
         return new DecodeExecutePipelineRegister(
@@ -323,7 +352,7 @@ public class Computer {
         if (decodeExecute == null) return;
 
         short aluResult =
-            alu.execute(decodeExecute.opcode, decodeExecute.r1Data, decodeExecute.aluSrc);
+            alu.execute(decodeExecute.aluOpcode, decodeExecute.r1Data, decodeExecute.aluSrc);
 
         byte memoryData = 0;
 
@@ -339,19 +368,25 @@ public class Computer {
             if (decodeExecute.writeMemoryToRegister) {
                 registerFile.setGeneralPurposeRegister(decodeExecute.r1, memoryData);
             } else {
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, decodeExecute.r2Data);
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) aluResult);
             }
         }
 
 
         if (decodeExecute.isJump) {
             registerFile.setProgramCounter(aluResult);
-
+            System.out.println("Set PC to " + aluResult + " in execute stage");
             // Flush the pipeline
             fetchDecode = null;
             decodeExecute = null;
         } else if (decodeExecute.isBranch && decodeExecute.r1Data == 0) {
-            registerFile.setProgramCounter(aluResult);
+            registerFile.setProgramCounter((short) (
+                decodeExecute.instructionAddress + 1 + decodeExecute.immediate
+            ));
+
+            System.out.println(
+                "Set PC to " + registerFile.getProgramCounter() +
+                " in execute stage");
 
             // Flush the pipeline
             fetchDecode = null;

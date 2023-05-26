@@ -3,22 +3,22 @@ package ca.memory;
 import java.util.Arrays;
 
 public class InstructionMemory {
-    private final short[] memoryArray;
+    private final Short[] memoryArray;
 
     public InstructionMemory(int size) {
-        memoryArray = new short[size];
+        memoryArray = new Short[size];
 
-        // Initialize memory with -1 so we can detect uninitialized memory
-        Arrays.fill(memoryArray, (short) -1);
+        Arrays.fill(memoryArray, null);
     }
 
-    public short read(int address) {
+    public Short read(int address) {
         return memoryArray[address];
+
     }
 
-    public void write(int address, short value) {
+    public void write(int address, Short value) {
         memoryArray[address] = value;
-        System.out.println("Value" + value + "was written to" + "address" + address);
+        System.out.println("Value" + value + "was written to address" + address);
     }
 
     public void loadProgram(short[] instructions) {
@@ -35,7 +35,7 @@ public class InstructionMemory {
     }
 
     public void clearInstructionMemory() {
-        Arrays.fill(memoryArray, (short) -1);
+        Arrays.fill(memoryArray, null);
     }
 
     public void printDataMemory() {
