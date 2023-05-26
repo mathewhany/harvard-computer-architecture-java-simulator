@@ -1,0 +1,4 @@
+LDI R1 3
+LDI R2 4
+ADD R1 R2
+SB R1 5

@@ -11,20 +11,17 @@ public class Main {
         int instructionMemorySize = 1024;
         int dataMemorySize = 2048;
         int generalPurposeRegisterCount = 64;
-        String programPath = "program.txt";
+        String programPath = "src/main/resources/program.txt";
 
-        Computer computer =
-            new Computer(
-                new InstructionMemory(instructionMemorySize),
-                new DataMemory(dataMemorySize),
-                new RegisterFile(generalPurposeRegisterCount)
-            );
+        Computer computer = new Computer(
+            new InstructionMemory(instructionMemorySize),
+            new DataMemory(dataMemorySize),
+            new RegisterFile(generalPurposeRegisterCount),
+            new AssemblyInstructionParser()
+        );
 
         try {
-            computer.runProgram(new FileProgramLoader(
-                programPath,
-                new AssemblyInstructionParser()
-            ));
+            computer.runProgram(new FileProgramLoader(programPath));
         } catch (CaException e) {
             System.err.println(e.getMessage());
         }

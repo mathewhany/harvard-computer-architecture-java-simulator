@@ -3,74 +3,142 @@ package ca;
 import ca.memory.DataMemory;
 import ca.memory.InstructionMemory;
 import ca.memory.RegisterFile;
+import ca.parser.InstructionParser;
 import ca.parser.ProgramLoader;
+
+import java.util.List;
 
 public class Computer {
     private final InstructionMemory instructionMemory;
     private final DataMemory dataMemory;
     private final RegisterFile registerFile;
+    private final InstructionParser instructionParser;
+
+    private FetchDecodePipelineRegister fetchDecode;
+    private DecodeExecutePipelineRegister decodeExecute;
+
+    private int clock;
 
     public Computer(
-        InstructionMemory instructionMemory, DataMemory dataMemory, RegisterFile registerFile
+        InstructionMemory instructionMemory,
+        DataMemory dataMemory,
+        RegisterFile registerFile,
+        InstructionParser parser
     ) {
         this.instructionMemory = instructionMemory;
         this.dataMemory = dataMemory;
         this.registerFile = registerFile;
+        this.instructionParser = parser;
     }
 
     public void runProgram(ProgramLoader programLoader) throws CaException {
-        short[] instructions = programLoader.loadProgram();
-        instructionMemory.loadProgram(instructions);
+        int programSize = loadProgram(programLoader);
 
-        FetchDecodePipelineRegister fetchDecode = null;
-        DecodeExecutePipelineRegister decodeExecute = null;
+        fetchDecode = null;
+        decodeExecute = null;
 
-        while (registerFile.getProgramCounter() < instructions.length) {
+        clock = 1;
+
+        while (true) {
+            System.out.println();
+            System.out.println();
+            System.out.println("#################### Clock " + clock + " ####################");
+
+            printInstructionsAtStages();
+
+            printPipelineRegisters("Pipeline registers at start of cycle " + clock);
+
             FetchDecodePipelineRegister nextFetchOutput = fetch();
+            DecodeExecutePipelineRegister nextDecodeExecute = decode();
 
-            DecodeExecutePipelineRegister nextDecodeOutput = null;
-            if (fetchDecode != null) {
-                nextDecodeOutput = decode(fetchDecode);
-            }
-
-            if (decodeExecute != null) {
-                execute(decodeExecute);
-            }
+            execute();
 
             fetchDecode = nextFetchOutput;
-            decodeExecute = nextDecodeOutput;
+            decodeExecute = nextDecodeExecute;
+
+            printPipelineRegisters("Pipeline registers after cycle " + clock);
+
+            System.out.println(
+                "#################### End of cycle " + clock + " ####################");
+            System.out.println();
+            System.out.println();
+            clock++;
+
+            if (fetchDecode == null && decodeExecute == null) {
+                System.out.println("Program finished");
+                break;
+            }
         }
+
+        dataMemory.printDataMemory();
+        registerFile.printAllRegisters();
+    }
+
+    private void printInstructionsAtStages() {
+        System.out.println("Instruction At Fetch: " + registerFile.getProgramCounter());
+        System.out.println("Instruction At Decode: " +
+                           (fetchDecode != null ? fetchDecode.instructionAddress : "None"));
+        System.out.println("Instruction At Execute: " +
+                           (decodeExecute != null ? decodeExecute.instructionAddress : "None"));
+    }
+
+    private void printPipelineRegisters(String title) {
+        System.out.println(title);
+        System.out.println(
+            fetchDecode == null ? "Fetch Decode register is empty" : fetchDecode);
+        System.out.println(
+            decodeExecute == null ? "Decode Execute register is empty" : decodeExecute);
+    }
+
+    private int loadProgram(ProgramLoader programLoader) throws CaException {
+        List<String> unparsedInstructions = programLoader.loadProgram();
+        short[] parsedInstructions = new short[unparsedInstructions.size()];
+        for (int i = 0; i < unparsedInstructions.size(); i++) {
+            parsedInstructions[i] = instructionParser.parse(unparsedInstructions.get(i));
+        }
+        instructionMemory.loadProgram(parsedInstructions);
+        return parsedInstructions.length;
     }
 
     private FetchDecodePipelineRegister fetch() {
-        if (registerFile.getProgramCounter() == null) {
-            System.out.println("All instructions fetched");
-            return null;
-        } else {
-            short instruction = instructionMemory.read(registerFile.getProgramCounter());
-            FetchDecodePipelineRegister out = new FetchDecodePipelineRegister(instruction);
-            System.out.println("Instruction" + registerFile.getProgramCounter() + "fetched");
-            System.out.println("Instruction : " + Integer.toBinaryString(instruction));
-            registerFile.incrementProgramCounter();
-            return out;
-        }
+        short pc = registerFile.getProgramCounter();
+        short instruction = instructionMemory.read(pc);
+
+        if (instruction == -1) return null;
+
+        FetchDecodePipelineRegister out = new FetchDecodePipelineRegister(pc, instruction);
+        System.out.println("Instruction #" + pc + " fetched");
+        System.out.println("Instruction Binary: " + Integer.toBinaryString(instruction));
+        registerFile.incrementProgramCounter();
+        return out;
     }
 
     public static class FetchDecodePipelineRegister {
         public short instruction;
+        public int instructionAddress;
 
-        public FetchDecodePipelineRegister(short instruction) {
+        public FetchDecodePipelineRegister(int instructionAddress, short instruction) {
+            this.instructionAddress = instructionAddress;
             this.instruction = instruction;
+        }
+
+        @Override
+        public String toString() {
+            return "Fetch Decode Pipeline Register { " +
+                   "instruction=" + Integer.toBinaryString(instruction) +
+                   " }";
         }
     }
 
-    private DecodeExecutePipelineRegister decode(FetchDecodePipelineRegister fetchOutput) {
+    private DecodeExecutePipelineRegister decode() {
+        if (fetchDecode == null) return null;
+
         short opcode;
         short r1 = 0;
         short r2 = 0;
         short immediate = 0;
         boolean isBranch = false;
-        short instruction = fetchOutput.instruction;
+        short instruction = fetchDecode.instruction;
         short maskOpCode = (short) 0b1111000000000000;
         opcode = (short) (instruction & maskOpCode);
         opcode = (short) (opcode >> 12);
@@ -97,6 +165,7 @@ public class Computer {
         byte r2Data = registerFile.getGeneralPurposeRegister(r2);
 
         return new DecodeExecutePipelineRegister(
+            fetchDecode.instructionAddress,
             opcode,
             r1Data,
             r2Data,
@@ -109,6 +178,7 @@ public class Computer {
     }
 
     public static class DecodeExecutePipelineRegister {
+        public int instructionAddress;
         public short opcode;
         public short r1Data;
         public short r2Data;
@@ -118,6 +188,7 @@ public class Computer {
         public short r2;
 
         public DecodeExecutePipelineRegister(
+            int instructionAddress,
             short opcode,
             short r1Data,
             short r2Data,
@@ -126,6 +197,7 @@ public class Computer {
             short r1,
             short r2
         ) {
+            this.instructionAddress = instructionAddress;
             this.opcode = opcode;
             this.r1Data = r1Data;
             this.r2Data = r2Data;
@@ -133,97 +205,113 @@ public class Computer {
             this.isBranch = isBranch;
             this.r1 = r1;
             this.r2 = r2;
-
         }
 
+        @Override
+        public String toString() {
+            return "Decode Execute Pipeline Register { " +
+                   "opcode=" + opcode +
+                   ", R1 Data=" + r1Data +
+                   ", R2 Data=" + r2Data +
+                   ", Immediate=" + immediate +
+                   ", Is Branch=" + isBranch +
+                   ", R1 =" + r1 +
+                   ", R2 =" + r2 +
+                   " }";
+        }
 
     }
 
-    private void execute(DecodeExecutePipelineRegister decodeOutput) {
+    private void execute() {
+        if (decodeExecute == null) return;
+
         int r = 0;
-        switch (decodeOutput.opcode) {
+        switch (decodeExecute.opcode) {
             case Opcode.ADD:
-                r = decodeOutput.r1Data + decodeOutput.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+                r = decodeExecute.r1Data + decodeExecute.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
                 break;
             case Opcode.SUB:
-                r = decodeOutput.r1Data - decodeOutput.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+                r = decodeExecute.r1Data - decodeExecute.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
                 break;
             case Opcode.MUL:
-                r = decodeOutput.r1Data * decodeOutput.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+                r = decodeExecute.r1Data * decodeExecute.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
                 break;
             case Opcode.LDI:
                 registerFile.setGeneralPurposeRegister(
-                    decodeOutput.r1,
-                    (byte) (decodeOutput.immediate)
+                    decodeExecute.r1,
+                    (byte) (decodeExecute.immediate)
                 );
                 break;
             case Opcode.BEQZ:
-                if (decodeOutput.r1Data == 0) {
+                if (decodeExecute.r1Data == 0) {
                     registerFile.setProgramCounter((short) (
-                        registerFile.getProgramCounter() + 1 + decodeOutput.immediate
+                        registerFile.getProgramCounter() + 1 + decodeExecute.immediate
                     ));
+
+                    fetchDecode = null;
+                    decodeExecute = null;
                 }
-                break;
+                return;
             case Opcode.AND:
-                r = decodeOutput.r1Data & decodeOutput.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+                r = decodeExecute.r1Data & decodeExecute.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
                 break;
             case Opcode.OR:
-                r = decodeOutput.r1Data | decodeOutput.r2Data;
-                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+                r = decodeExecute.r1Data | decodeExecute.r2Data;
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
                 break;
             case Opcode.JR:
                 registerFile.setProgramCounter(
                     Short.parseShort(
-                        String.valueOf(decodeOutput.r1Data)
-                              .concat(String.valueOf(decodeOutput.r2Data))
+                        String.valueOf(decodeExecute.r1Data)
+                              .concat(String.valueOf(decodeExecute.r2Data))
                     )
                 );
                 break;
             case Opcode.SLC:
-                r = (decodeOutput.r1Data << decodeOutput.immediate) |
-                    (decodeOutput.r1Data >>> (8 - decodeOutput.immediate));
-                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+                r = (decodeExecute.r1Data << decodeExecute.immediate) |
+                    (decodeExecute.r1Data >>> (8 - decodeExecute.immediate));
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
                 break;
             case Opcode.SRC:
-                r = (decodeOutput.r1Data >>> decodeOutput.immediate) |
-                    (decodeOutput.r1Data << (8 - decodeOutput.immediate));
-                registerFile.setGeneralPurposeRegister(decodeOutput.r1, (byte) r);
+                r = (decodeExecute.r1Data >>> decodeExecute.immediate) |
+                    (decodeExecute.r1Data << (8 - decodeExecute.immediate));
+                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) r);
                 break;
             case Opcode.LB:
                 registerFile.setGeneralPurposeRegister(
-                    decodeOutput.r1,
-                    dataMemory.read(decodeOutput.immediate)
+                    decodeExecute.r1,
+                    dataMemory.read(decodeExecute.immediate)
                 );
                 break;
             case Opcode.SB:
-                dataMemory.write(decodeOutput.immediate, (byte) (decodeOutput.r1Data));
+                dataMemory.write(decodeExecute.immediate, (byte) (decodeExecute.r1Data));
                 break;
             default:
-                System.out.println("Invalid opcode " + decodeOutput.opcode);
+                System.out.println("Invalid opcode " + decodeExecute.opcode);
                 return;
         }
 
-        if (decodeOutput.opcode == Opcode.ADD ||
-            decodeOutput.opcode == Opcode.SUB ||
-            decodeOutput.opcode == Opcode.MUL ||
-            decodeOutput.opcode == Opcode.AND ||
-            decodeOutput.opcode == Opcode.OR ||
-            decodeOutput.opcode == Opcode.SLC ||
-            decodeOutput.opcode == Opcode.SRC) {
+        if (decodeExecute.opcode == Opcode.ADD ||
+            decodeExecute.opcode == Opcode.SUB ||
+            decodeExecute.opcode == Opcode.MUL ||
+            decodeExecute.opcode == Opcode.AND ||
+            decodeExecute.opcode == Opcode.OR ||
+            decodeExecute.opcode == Opcode.SLC ||
+            decodeExecute.opcode == Opcode.SRC) {
             registerFile.setZeroFlag(r == 0);
             registerFile.setNegativeFlag(r < 0);
         }
 
-        if (decodeOutput.opcode == Opcode.ADD) {
+        if (decodeExecute.opcode == Opcode.ADD) {
             registerFile.setCarryFlag(BitUtils.getBit(r, 8) == 1);
 
-            if ((decodeOutput.r1Data > 0 && decodeOutput.r2Data > 0) ||
-                (decodeOutput.r1Data < 0 && decodeOutput.r2Data < 0)) {
-                if ((decodeOutput.r2Data > 0 && r < 0) || (decodeOutput.r2Data < 0 && r > 0)) {
+            if ((decodeExecute.r1Data > 0 && decodeExecute.r2Data > 0) ||
+                (decodeExecute.r1Data < 0 && decodeExecute.r2Data < 0)) {
+                if ((decodeExecute.r2Data > 0 && r < 0) || (decodeExecute.r2Data < 0 && r > 0)) {
                     registerFile.set2sComplementOverflowFlag(true);
                 }
                 registerFile.setSignFlag(
@@ -231,11 +319,11 @@ public class Computer {
             }
         }
 
-        if (decodeOutput.opcode == Opcode.SUB) {
-            if ((decodeOutput.r1Data > 0 && decodeOutput.r2Data < 0) ||
-                (decodeOutput.r1Data < 0 && decodeOutput.r2Data > 0)) {
-                if ((decodeOutput.r2Data >= 0 && r >= 0) ||
-                    (decodeOutput.r2Data < 0 && r < 0)) {
+        if (decodeExecute.opcode == Opcode.SUB) {
+            if ((decodeExecute.r1Data > 0 && decodeExecute.r2Data < 0) ||
+                (decodeExecute.r1Data < 0 && decodeExecute.r2Data > 0)) {
+                if ((decodeExecute.r2Data >= 0 && r >= 0) ||
+                    (decodeExecute.r2Data < 0 && r < 0)) {
                     registerFile.set2sComplementOverflowFlag(true);
                 }
             }

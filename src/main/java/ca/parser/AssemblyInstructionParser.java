@@ -2,14 +2,13 @@ package ca.parser;
 
 public class AssemblyInstructionParser implements InstructionParser {
     public short parse(String instruction) {
-//        return parseMIPSAssembly(instruction);
-        return 0;
+        return parseMIPSAssembly(instruction);
     }
 
     private static short parseMIPSAssembly(String assemblyCode) {
         String[] assemblyCodeArray = assemblyCode.split(" ");
         short binaryCode = 0;
-        switch (assemblyCodeArray[0]) {
+        switch (assemblyCodeArray[0].toUpperCase()) {
             case "ADD":
                 binaryCode = 0;
                 break;
@@ -49,17 +48,15 @@ public class AssemblyInstructionParser implements InstructionParser {
         }
         int firstOperand = Integer.parseInt(assemblyCodeArray[1].substring(1));
         int secondOperand = 0;
-        if(assemblyCodeArray[2].charAt(0) == 'R'){
+        if (assemblyCodeArray[2].charAt(0) == 'R') {
             secondOperand = Integer.parseInt(assemblyCodeArray[2].substring(1));
-        }else{
+        } else {
             secondOperand = Integer.parseInt(assemblyCodeArray[2]);
         }
         binaryCode = (short) (binaryCode << 6 | firstOperand);
         binaryCode = (short) (binaryCode << 6 | secondOperand);
         return binaryCode;
     }
-
-
 
     private static void test() {
         String assemblyCode1 = "ADD R0 R1";

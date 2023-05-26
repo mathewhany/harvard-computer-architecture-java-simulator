@@ -2,6 +2,8 @@ package ca.parser;
 
 import ca.CaException;
 
+import java.util.List;
+
 public interface ProgramLoader {
-    short[] loadProgram() throws CaException;
+    List<String> loadProgram() throws CaException;
 }
