@@ -19,7 +19,10 @@ public class ALU {
         this.registerFile = registerFile;
     }
 
-    public short execute(int aluOpcode, short a, short b) throws CaException {
+    public short execute(int aluOpcode, byte a, byte b) throws CaException {
+        // https://piazza.com/class/le8zgqxowmd6e7/post/72
+        registerFile.resetFlags();
+
         int r;
         switch (aluOpcode) {
             case ADD:
@@ -54,6 +57,8 @@ public class ALU {
                 throw new CaException("Invalid ALU opcode " + aluOpcode);
         }
 
+        byte rByte = (byte) r;
+
         if (aluOpcode == ADD ||
             aluOpcode == SUB ||
             aluOpcode == MUL ||
@@ -61,31 +66,17 @@ public class ALU {
             aluOpcode == OR ||
             aluOpcode == SLC ||
             aluOpcode == SRC) {
-            registerFile.setZeroFlag(r == 0);
-            registerFile.setNegativeFlag(r < 0);
+            registerFile.setZeroFlag(rByte == 0);
+            registerFile.setNegativeFlag(rByte < 0);
         }
 
         if (aluOpcode == ADD) {
-            registerFile.setCarryFlag(BitUtils.getBit(r, 8) == 1);
-
-            if ((a > 0 && b > 0) ||
-                (a < 0 && b < 0)) {
-                if ((a > 0 && r < 0) || (a < 0 && r > 0)) {
-                    registerFile.set2sComplementOverflowFlag(true);
-                }
-                registerFile.setSignFlag(
-                    registerFile.getNegativeFlag() ^ registerFile.get2sComplementOverflowFlag());
-            }
+            registerFile.setCarryFlag(BitUtils.hasCarry(a, b));
         }
 
-        if (aluOpcode == SUB) {
-            if ((a > 0 && b < 0) ||
-                (a < 0 && b > 0)) {
-                if ((a > 0 && r > 0) ||
-                    (a < 0 && r < 0)) {
-                    registerFile.set2sComplementOverflowFlag(true);
-                }
-            }
+        if (aluOpcode == ADD || aluOpcode == SUB) {
+            registerFile.set2sComplementOverflowFlag(
+                BitUtils.has2sComplementOverflow(a, b, rByte));
 
             registerFile.setSignFlag(
                 registerFile.getNegativeFlag() ^ registerFile.get2sComplementOverflowFlag());

@@ -24,6 +24,7 @@ public class Computer {
     private FetchDecodePipelineRegister fetchDecode;
     private DecodeExecutePipelineRegister decodeExecute;
     private ForwardingPipelineRegister forwardingPipelineRegister;
+    private boolean flushPipeline = false;
 
     public Computer(
         InstructionMemory instructionMemory,
@@ -57,13 +58,19 @@ public class Computer {
 
             printPipelineRegisters("Pipeline registers at start of cycle " + clock);
 
-            FetchDecodePipelineRegister nextFetchOutput = fetch();
+            FetchDecodePipelineRegister nextFetchDecode = fetch();
             DecodeExecutePipelineRegister nextDecodeExecute = decode();
             ForwardingPipelineRegister nextForwarding = execute();
 
+            if (!flushPipeline) {
+                fetchDecode = nextFetchDecode;
+                decodeExecute = nextDecodeExecute;
+            } else {
+                fetchDecode = null;
+                decodeExecute = null;
+                flushPipeline = false;
+            }
 
-            fetchDecode = nextFetchOutput;
-            decodeExecute = nextDecodeExecute;
             forwardingPipelineRegister = nextForwarding;
 
             printPipelineRegisters("Pipeline registers after cycle " + clock);
@@ -74,7 +81,7 @@ public class Computer {
             System.out.println();
             clock++;
 
-            if (fetchDecode == null && decodeExecute == null) {
+            if (!hasInstructions() && fetchDecode == null && decodeExecute == null) {
                 System.out.println("Program finished");
                 break;
             }
@@ -84,11 +91,12 @@ public class Computer {
         registerFile.printAllRegisters();
     }
 
+    private boolean hasInstructions() {
+        return instructionMemory.read(registerFile.getProgramCounter()) != null;
+    }
     private void printInstructionsAtStages() {
-        boolean hasFetch = instructionMemory.read(registerFile.getProgramCounter()) != null;
-
         System.out.println(
-            "Instruction At Fetch: " + (hasFetch ? registerFile.getProgramCounter() : "None"));
+            "Instruction At Fetch: " + (hasInstructions() ? registerFile.getProgramCounter() : "None"));
         System.out.println("Instruction At Decode: " +
                            (fetchDecode != null ? fetchDecode.instructionAddress : "None"));
         System.out.println("Instruction At Execute: " +
@@ -148,7 +156,12 @@ public class Computer {
         short opcode = (short) BitUtils.getBits(instruction, 12, 15);
         short r1 = (short) BitUtils.getBits(instruction, 6, 11);
         short r2 = (short) BitUtils.getBits(instruction, 0, 5);
-        short immediate = (short) BitUtils.signExtend(BitUtils.getBits(instruction, 0, 5), 6);
+        byte immediate = (byte) BitUtils.getBits(instruction, 0, 5);
+
+        // https://piazza.com/class/le8zgqxowmd6e7/post/19 (Remark 4)
+        if (opcode != Opcode.SLC && opcode != Opcode.SRC) {
+            immediate = (byte) BitUtils.signExtend(immediate, 6);
+        }
 
         if (opcode == Opcode.BEQZ) {
             isBranch = true;
@@ -295,7 +308,7 @@ public class Computer {
             }
         }
 
-        short aluSrc = decodeExecute.aluSrc == ALU_SRC_R2 ? r2Data : decodeExecute.immediate;
+        byte aluSrc = decodeExecute.aluSrc == ALU_SRC_R2 ? r2Data : decodeExecute.immediate;
 
         short aluResult =
             alu.execute(decodeExecute.aluOpcode, r1Data, aluSrc);
@@ -326,8 +339,7 @@ public class Computer {
             registerFile.setProgramCounter(aluResult);
             System.out.println("Set PC to " + aluResult + " in execute stage");
             // Flush the pipeline
-            fetchDecode = null;
-            decodeExecute = null;
+            flushPipeline = true;
         } else if (decodeExecute.isBranch && r1Data == 0) {
             registerFile.setProgramCounter((short) (
                 decodeExecute.instructionAddress + 1 + decodeExecute.immediate
@@ -338,11 +350,10 @@ public class Computer {
                 " in execute stage");
 
             // Flush the pipeline
-            fetchDecode = null;
-            decodeExecute = null;
+            flushPipeline = true;
         }
 
-        System.out.println(forwardingPipelineRegister);
+        System.out.println("Execute Output: " + forwardingPipelineRegister);
         System.out.println();
 
         return forwardingPipelineRegister;

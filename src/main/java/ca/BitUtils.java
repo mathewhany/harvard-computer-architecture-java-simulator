@@ -52,4 +52,22 @@ public class BitUtils {
 
         return bits | ~mask;
     }
+
+    public static boolean hasCarry(int a, int b) {
+        int aInt = a;
+        int bInt = b;
+        aInt &= 0x0000_00FF;
+        bInt &= 0x0000_00FF;
+
+        int rInt = aInt + bInt;
+
+        return getBit(rInt, 8) == 1;
+    }
+
+    public static boolean has2sComplementOverflow(byte a, byte b, int result) {
+        boolean lastCarry = hasCarry(a, b);
+        boolean secondLastCarry = (getBit(a, 7) == 1) ^ (getBit(b, 7) == 1) ^ (getBit(result, 7) == 1);
+
+        return lastCarry ^ secondLastCarry;
+    }
 }

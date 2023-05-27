@@ -106,4 +106,8 @@ public class RegisterFile {
         System.out.println();
         System.out.println();
     }
+
+    public void resetFlags() {
+        statusReg = 0;
+    }
 }

@@ -5,7 +5,7 @@ public class DecodeExecutePipelineRegister {
     public short opcode;
     public byte r1Data;
     public byte r2Data;
-    public short immediate;
+    public byte immediate;
     public boolean isBranch;
     public boolean isJump;
     public short r1;
@@ -22,7 +22,7 @@ public class DecodeExecutePipelineRegister {
         short opcode,
         byte r1Data,
         byte r2Data,
-        short immediate,
+        byte immediate,
         boolean isBranch,
         boolean isJump,
         short r1,
