@@ -36,4 +36,20 @@ public class BitUtils {
 
         return binaryString;
     }
+
+    public static int signExtend(int bits, int length) {
+        int signBit = getBit(bits, length - 1);
+
+        if (signBit == 0) {
+            return bits;
+        }
+
+        int mask = 0;
+
+        for (int i = 0; i < length; i++) {
+            mask |= 1 << i;
+        }
+
+        return bits | ~mask;
+    }
 }

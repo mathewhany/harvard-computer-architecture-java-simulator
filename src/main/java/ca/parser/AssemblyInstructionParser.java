@@ -46,13 +46,15 @@ public class AssemblyInstructionParser implements InstructionParser {
                 binaryCode = 11;
                 break;
         }
-        int firstOperand = Integer.parseInt(assemblyCodeArray[1].substring(1));
+        int maskOperand = 0b0000_0000_0000_0000_0000_0000_0011_1111;
+        int firstOperand = (Integer.parseInt(assemblyCodeArray[1].substring(1))) & maskOperand;
         int secondOperand = 0;
         if (assemblyCodeArray[2].charAt(0) == 'R') {
             secondOperand = Integer.parseInt(assemblyCodeArray[2].substring(1));
         } else {
             secondOperand = Integer.parseInt(assemblyCodeArray[2]);
         }
+        secondOperand = secondOperand & maskOperand;
         binaryCode = (short) (binaryCode << 6 | firstOperand);
         binaryCode = (short) (binaryCode << 6 | secondOperand);
         return binaryCode;

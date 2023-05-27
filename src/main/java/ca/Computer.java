@@ -3,13 +3,18 @@ package ca;
 import ca.memory.DataMemory;
 import ca.memory.InstructionMemory;
 import ca.memory.RegisterFile;
-import ca.parser.AssemblyInstructionParser;
 import ca.parser.InstructionParser;
 import ca.parser.ProgramLoader;
+import ca.pipelining.DecodeExecutePipelineRegister;
+import ca.pipelining.ForwardingPipelineRegister;
+import ca.pipelining.FetchDecodePipelineRegister;
 
 import java.util.List;
 
 public class Computer {
+    private static final short ALU_SRC_R2 = 0;
+    private static final short ALU_SRC_IMMEDIATE = 1;
+
     private final InstructionMemory instructionMemory;
     private final DataMemory dataMemory;
     private final RegisterFile registerFile;
@@ -18,6 +23,7 @@ public class Computer {
 
     private FetchDecodePipelineRegister fetchDecode;
     private DecodeExecutePipelineRegister decodeExecute;
+    private ForwardingPipelineRegister forwardingPipelineRegister;
 
     public Computer(
         InstructionMemory instructionMemory,
@@ -38,6 +44,7 @@ public class Computer {
 
         fetchDecode = null;
         decodeExecute = null;
+        forwardingPipelineRegister = null;
 
         int clock = 1;
 
@@ -51,12 +58,13 @@ public class Computer {
             printPipelineRegisters("Pipeline registers at start of cycle " + clock);
 
             FetchDecodePipelineRegister nextFetchOutput = fetch();
-            execute();
             DecodeExecutePipelineRegister nextDecodeExecute = decode();
+            ForwardingPipelineRegister nextForwarding = execute();
 
 
             fetchDecode = nextFetchOutput;
             decodeExecute = nextDecodeExecute;
+            forwardingPipelineRegister = nextForwarding;
 
             printPipelineRegisters("Pipeline registers after cycle " + clock);
 
@@ -88,11 +96,16 @@ public class Computer {
     }
 
     private void printPipelineRegisters(String title) {
+        System.out.println();
         System.out.println(title);
         System.out.println(
             fetchDecode == null ? "Fetch Decode register is empty" : fetchDecode);
         System.out.println(
             decodeExecute == null ? "Decode Execute register is empty" : decodeExecute);
+        System.out.println(
+            forwardingPipelineRegister ==
+            null ? "Forwarding register is empty" : forwardingPipelineRegister);
+        System.out.println();
     }
 
     private void loadProgram(ProgramLoader programLoader) throws CaException {
@@ -105,6 +118,8 @@ public class Computer {
     }
 
     private FetchDecodePipelineRegister fetch() {
+        System.out.println();
+        System.out.println("Fetch Stage Inputs: PC = " + registerFile.getProgramCounter());
         short pc = registerFile.getProgramCounter();
         Short instruction = instructionMemory.read(pc);
 
@@ -115,27 +130,17 @@ public class Computer {
         System.out.println("Instruction Binary: " + BitUtils.toBinaryString(instruction, 16));
         System.out.println("Incremented PC to " + (pc + 1) + " in Fetch stage");
         registerFile.incrementProgramCounter();
+
+        System.out.println("Fetch Stage Outputs: " + out);
+        System.out.println();
+
         return out;
     }
 
-    public static class FetchDecodePipelineRegister {
-        public short instruction;
-        public int instructionAddress;
-
-        public FetchDecodePipelineRegister(int instructionAddress, short instruction) {
-            this.instructionAddress = instructionAddress;
-            this.instruction = instruction;
-        }
-
-        @Override
-        public String toString() {
-            return "Fetch Decode Pipeline Register { " +
-                   "instruction=" + BitUtils.toBinaryString(instruction, 16) +
-                   " }";
-        }
-    }
-
     private DecodeExecutePipelineRegister decode() throws CaException {
+        System.out.println();
+        System.out.println("Decode stage Inputs: " + fetchDecode);
+
         if (fetchDecode == null) return null;
 
         boolean isBranch = false;
@@ -143,7 +148,7 @@ public class Computer {
         short opcode = (short) BitUtils.getBits(instruction, 12, 15);
         short r1 = (short) BitUtils.getBits(instruction, 6, 11);
         short r2 = (short) BitUtils.getBits(instruction, 0, 5);
-        short immediate = (short) BitUtils.getBits(instruction, 0, 5);
+        short immediate = (short) BitUtils.signExtend(BitUtils.getBits(instruction, 0, 5), 6);
 
         if (opcode == Opcode.BEQZ) {
             isBranch = true;
@@ -152,22 +157,20 @@ public class Computer {
         byte r1Data = registerFile.getGeneralPurposeRegister(r1);
         byte r2Data = registerFile.getGeneralPurposeRegister(r2);
 
-        /**
-         * True for Opcode.JR only
-         */
+        // True for Opcode.JR only
         boolean isJump = opcode == Opcode.JR;
 
-        /**
-         * Opcode.ADD -> ALU.ADD
-         * Opcode.SUB -> ALU.SUB
-         * Opcode.MUL -> ALU.MUL
-         * Opcode.AND -> ALU.AND
-         * Opcode.OR -> ALU.OR
-         * Opcode.SLC -> ALU.SLC
-         * Opcode.SRL -> ALU.SRL
-         * Opcode.SB, Opcode.LB, Opcode.LDI, Opcode.BEQZ -> ALU.TRANSFER
-         * Opcode.JR -> ALU.CONCAT
-         */
+        /*
+         Opcode.ADD -> ALU.ADD
+         Opcode.SUB -> ALU.SUB
+         Opcode.MUL -> ALU.MUL
+         Opcode.AND -> ALU.AND
+         Opcode.OR -> ALU.OR
+         Opcode.SLC -> ALU.SLC
+         Opcode.SRL -> ALU.SRL
+         Opcode.SB, Opcode.LB, Opcode.LDI, Opcode.BEQZ -> ALU.TRANSFER
+         Opcode.JR -> ALU.CONCAT
+        */
         int aluOpcode = opcode;
         switch (opcode) {
             case Opcode.SB:
@@ -204,22 +207,18 @@ public class Computer {
                 throw new CaException("Invalid opcode: " + opcode);
         }
 
-        /**
-         * True for Opcode.SB only
-         */
+        // True for Opcode.SB only
         boolean memoryWrite = opcode == Opcode.SB;
 
-        /**
-         * True for Opcode.LB only
-         */
+        // True for Opcode.LB only
         boolean memoryRead = opcode == Opcode.LB;
 
-        /**
-         * The ALU will always be given R1 as a first operand,
-         * and aluSrc as the second operand.
-         *
-         * For Opcode.ADD, Opcode.SUB, Opcode.MUL, Opcode.AND, Opcode.OR, Opcode.JR -> aluSrc = R2
-         * For Opcode.SLC, Opcode.SRC, Opcode.LDI, Opcode.BEQZ, Opcode.SB, Opcode.LB -> aluSrc = immediate
+        /*
+          The ALU will always be given R1 as a first operand,
+          and aluSrc as the second operand.
+
+          For Opcode.ADD, Opcode.SUB, Opcode.MUL, Opcode.AND, Opcode.OR, Opcode.JR -> aluSrc = R2
+          For Opcode.SLC, Opcode.SRC, Opcode.LDI, Opcode.BEQZ, Opcode.SB, Opcode.LB -> aluSrc = immediate
          */
         short aluSrc = 0;
         switch (opcode) {
@@ -229,22 +228,20 @@ public class Computer {
             case Opcode.ADD:
             case Opcode.OR:
             case Opcode.JR:
-                aluSrc = r2Data;
+                aluSrc = ALU_SRC_R2;
                 break;
             default:
-                aluSrc = immediate;
+                aluSrc = ALU_SRC_IMMEDIATE;
                 break;
         }
 
-        /**
-         * True for Opcode.SB only
-         */
+        // True for Opcode.SB only
         boolean writeMemoryToRegister = opcode == Opcode.LB;
 
 
-        /**
-         * True for Opcode.ADD, Opcode.SUB, Opcode.MUL, Opcode.AND, Opcode.OR, Opcode.SLC, Opcode.SRL, Opcode.LDI, Opcode.LB -> regWrite = true
-         * True for Opcode.JR, Opcode.SB, Opcode.BEQZ -> regWrite = false
+        /*
+          True for Opcode.ADD, Opcode.SUB, Opcode.MUL, Opcode.AND, Opcode.OR, Opcode.SLC, Opcode.SRL, Opcode.LDI, Opcode.LB -> regWrite = true
+          True for Opcode.JR, Opcode.SB, Opcode.BEQZ -> regWrite = false
          */
         boolean regWrite = true;
         switch (opcode) {
@@ -255,7 +252,7 @@ public class Computer {
                 break;
         }
 
-        return new DecodeExecutePipelineRegister(
+        DecodeExecutePipelineRegister decodeExecute = new DecodeExecutePipelineRegister(
             fetchDecode.instructionAddress,
             opcode,
             r1Data,
@@ -273,86 +270,35 @@ public class Computer {
             regWrite
         );
 
+        System.out.println("Decode stage Outputs: " + decodeExecute);
+        System.out.println();
+
+        return decodeExecute;
     }
 
-    public static class DecodeExecutePipelineRegister {
-        public int instructionAddress;
-        public short opcode;
-        public byte r1Data;
-        public byte r2Data;
-        public short immediate;
-        public boolean isBranch;
-        public boolean isJump;
-        public short r1;
-        public short r2;
-        public int aluOpcode;
-        public boolean memoryWrite;
-        public boolean memoryRead;
-        public short aluSrc;
-        public boolean writeMemoryToRegister;
-        public boolean regWrite;
+    private ForwardingPipelineRegister execute() throws CaException {
+        System.out.println();
+        System.out.println("Execute Stage Inputs: " + decodeExecute);
 
-        public DecodeExecutePipelineRegister(
-            int instructionAddress,
-            short opcode,
-            byte r1Data,
-            byte r2Data,
-            short immediate,
-            boolean isBranch,
-            boolean isJump,
-            short r1,
-            short r2,
-            int aluOpcode,
-            boolean memoryWrite,
-            boolean memoryRead,
-            short aluSrc,
-            boolean writeMemoryToRegister,
-            boolean regWrite
-        ) {
-            this.instructionAddress = instructionAddress;
-            this.opcode = opcode;
-            this.r1Data = r1Data;
-            this.r2Data = r2Data;
-            this.immediate = immediate;
-            this.isBranch = isBranch;
-            this.isJump = isJump;
-            this.r1 = r1;
-            this.r2 = r2;
-            this.aluOpcode = aluOpcode;
-            this.memoryWrite = memoryWrite;
-            this.memoryRead = memoryRead;
-            this.aluSrc = aluSrc;
-            this.writeMemoryToRegister = writeMemoryToRegister;
-            this.regWrite = regWrite;
+        if (decodeExecute == null) return null;
+
+        byte r1Data = decodeExecute.r1Data;
+        byte r2Data = decodeExecute.r2Data;
+
+        if (forwardingPipelineRegister != null && forwardingPipelineRegister.regWrite) {
+            if (forwardingPipelineRegister.r1 == decodeExecute.r1) {
+                r1Data = forwardingPipelineRegister.r1NewData;
+            }
+
+            if (forwardingPipelineRegister.r1 == decodeExecute.r2) {
+                r2Data = forwardingPipelineRegister.r1NewData;
+            }
         }
 
-
-        @Override
-        public String toString() {
-            return "Decode Execute Pipeline Register {" +
-                   "opcode=" + opcode +
-                   ", r1Data=" + r1Data +
-                   ", r2Data=" + r2Data +
-                   ", immediate=" + immediate +
-                   ", isBranch=" + isBranch +
-                   ", isJump=" + isJump +
-                   ", r1=" + r1 +
-                   ", r2=" + r2 +
-                   ", aluOpcode=" + aluOpcode +
-                   ", memoryWrite=" + memoryWrite +
-                   ", memoryRead=" + memoryRead +
-                   ", aluSrc=" + aluSrc +
-                   ", writeMemoryToRegister=" + writeMemoryToRegister +
-                   ", regWrite=" + regWrite +
-                   " }";
-        }
-    }
-
-    private void execute() throws CaException {
-        if (decodeExecute == null) return;
+        short aluSrc = decodeExecute.aluSrc == ALU_SRC_R2 ? r2Data : decodeExecute.immediate;
 
         short aluResult =
-            alu.execute(decodeExecute.aluOpcode, decodeExecute.r1Data, decodeExecute.aluSrc);
+            alu.execute(decodeExecute.aluOpcode, r1Data, aluSrc);
 
         byte memoryData = 0;
 
@@ -361,17 +307,20 @@ public class Computer {
         }
 
         if (decodeExecute.memoryWrite) {
-            dataMemory.write(aluResult, decodeExecute.r1Data);
+            dataMemory.write(aluResult, r1Data);
         }
+
+        byte r1NewData = decodeExecute.writeMemoryToRegister ? memoryData : (byte) aluResult;
 
         if (decodeExecute.regWrite) {
-            if (decodeExecute.writeMemoryToRegister) {
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, memoryData);
-            } else {
-                registerFile.setGeneralPurposeRegister(decodeExecute.r1, (byte) aluResult);
-            }
+            registerFile.setGeneralPurposeRegister(decodeExecute.r1, r1NewData);
         }
 
+        ForwardingPipelineRegister forwardingPipelineRegister = new ForwardingPipelineRegister(
+            decodeExecute.r1,
+            r1NewData,
+            decodeExecute.regWrite
+        );
 
         if (decodeExecute.isJump) {
             registerFile.setProgramCounter(aluResult);
@@ -379,7 +328,7 @@ public class Computer {
             // Flush the pipeline
             fetchDecode = null;
             decodeExecute = null;
-        } else if (decodeExecute.isBranch && decodeExecute.r1Data == 0) {
+        } else if (decodeExecute.isBranch && r1Data == 0) {
             registerFile.setProgramCounter((short) (
                 decodeExecute.instructionAddress + 1 + decodeExecute.immediate
             ));
@@ -392,5 +341,10 @@ public class Computer {
             fetchDecode = null;
             decodeExecute = null;
         }
+
+        System.out.println(forwardingPipelineRegister);
+        System.out.println();
+
+        return forwardingPipelineRegister;
     }
 }

@@ -44,7 +44,9 @@ public class RegisterFile {
 
     public void setCarryFlag(boolean value) {
         statusReg = BitUtils.setBit(statusReg, 4, value);
-        System.out.println("Carry flag set to: " + value + " during execute stage");
+        System.out.println(
+            "Carry flag set to: " + value + " during execute stage, SREG=" +
+            BitUtils.toBinaryString(statusReg, 8));
     }
 
     public boolean get2sComplementOverflowFlag() {
@@ -53,7 +55,9 @@ public class RegisterFile {
 
     public void set2sComplementOverflowFlag(boolean value) {
         statusReg = BitUtils.setBit(statusReg, 3, value);
-        System.out.println("Overflow flag set to: " + value + " during execute stage");
+        System.out.println(
+            "Overflow flag set to: " + value + " during execute stage, SREG=" +
+            BitUtils.toBinaryString(statusReg, 8));
     }
 
     public boolean getNegativeFlag() {
@@ -62,7 +66,9 @@ public class RegisterFile {
 
     public void setNegativeFlag(boolean value) {
         statusReg = BitUtils.setBit(statusReg, 2, value);
-        System.out.println("Negative flag set to: " + value + " during execute stage");
+        System.out.println(
+            "Negative flag set to: " + value + " during execute stage, SREG=" +
+            BitUtils.toBinaryString(statusReg, 8));
     }
 
     public boolean getSignFlag() {
@@ -71,7 +77,9 @@ public class RegisterFile {
 
     public void setSignFlag(boolean value) {
         statusReg = BitUtils.setBit(statusReg, 1, value);
-        System.out.println("Sign flag set to: " + value + " during execute stage");
+        System.out.println(
+            "Sign flag set to: " + value + " during execute stage, SREG=" +
+            BitUtils.toBinaryString(statusReg, 8));
     }
 
     public boolean getZeroFlag() {
@@ -80,7 +88,9 @@ public class RegisterFile {
 
     public void setZeroFlag(boolean value) {
         statusReg = BitUtils.setBit(statusReg, 0, value);
-        System.out.println("Zero flag set to: " + value + " during execute stage");
+        System.out.println(
+            "Zero flag set to: " + value + " during execute stage, SREG=" +
+            BitUtils.toBinaryString(statusReg, 8));
     }
 
     public void printAllRegisters() {
