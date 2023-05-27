@@ -38,9 +38,13 @@ public class InstructionMemory {
         Arrays.fill(memoryArray, null);
     }
 
-    public void printDataMemory() {
+    public void printMemoryContents() {
+        System.out.println();
+        System.out.println("#################### Instruction Memory ####################");
         for (int i = 0; i < memoryArray.length; i++) {
-            System.out.println("Instruction memory address : " + i + " Value : " + read(i));
+            System.out.println("#" + i + ": " + read(i));
         }
+        System.out.println("############################################################");
+        System.out.println();
     }
 }

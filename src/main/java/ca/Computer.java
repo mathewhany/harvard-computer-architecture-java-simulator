@@ -87,6 +87,7 @@ public class Computer {
             }
         }
 
+        instructionMemory.printMemoryContents();
         dataMemory.printDataMemory();
         registerFile.printAllRegisters();
     }
